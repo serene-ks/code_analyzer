@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Code Analyzer — AI-Powered Code Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --surface: #13151c;
+      --surface2: #1c1f2b;
+      --border: #2a2d3d;
+      --accent: #7c6af7;
+      --accent2: #4fd1c5;
+      --danger: #f56565;
+      --warn: #f6ad55;
+      --success: #68d391;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --mono: 'Space Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+    /* NAV */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; gap: 2rem;
+      padding: 0 2rem; height: 56px;
+      background: rgba(11,12,16,0.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-family: var(--mono); font-weight: 700; font-size: 1rem; color: var(--accent); letter-spacing: -0.5px; }
+    .nav-links { display: flex; gap: 1.5rem; margin-left: auto; }
+    .nav-link {
+      font-size: 0.85rem; color: var(--muted); cursor: pointer;
+      padding: 0.3rem 0.6rem; border-radius: 6px; transition: all 0.2s;
+      border: none; background: none; font-family: var(--sans);
+    }
+    .nav-link:hover, .nav-link.active { color: var(--text); background: var(--surface2); }
+    .nav-link.active { color: var(--accent); }
+
+    /* LAYOUT */
+    main { padding-top: 56px; min-height: 100vh; }
+    .page { padding: 2.5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .hidden { display: none !important; }
+
+    /* HOME PAGE */
+    .hero { text-align: center; padding: 4rem 1rem 3rem; }
+    .hero h1 { font-family: var(--mono); font-size: clamp(2rem,5vw,3.5rem); color: var(--text); line-height: 1.1; margin-bottom: 1rem; }
+    .hero h1 span { color: var(--accent); }
+    .hero p { color: var(--muted); font-size: 1.1rem; max-width: 500px; margin: 0 auto 2rem; line-height: 1.6; }
+    .hero-btns { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.65rem 1.4rem; border-radius: 8px; font-size: 0.9rem;
+      font-family: var(--sans); font-weight: 500; cursor: pointer;
+      border: none; transition: all 0.2s; text-decoration: none;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #6b5ce7; transform: translateY(-1px); }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-danger { background: var(--danger); color: #fff; font-size: 0.8rem; padding: 0.4rem 0.9rem; }
+    .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.8rem; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 1rem; margin: 2rem 0; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.5rem; text-align: center;
+    }
+    .stat-card .stat-val { font-family: var(--mono); font-size: 2rem; color: var(--accent); font-weight: 700; }
+    .stat-card .stat-label { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; }
+
+    .section-title { font-family: var(--mono); font-size: 0.85rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem; }
+
+    /* ANALYZE PAGE */
+    .analyze-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media(max-width:768px) { .analyze-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.8rem 1.2rem; border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .card-title { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .card-body { padding: 1.2rem; }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.4rem; }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; padding: 0.6rem 0.8rem;
+      font-family: var(--sans); font-size: 0.9rem; transition: border-color 0.2s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .form-textarea { font-family: var(--mono); font-size: 0.82rem; resize: vertical; min-height: 280px; line-height: 1.6; }
+
+    .result-code {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem; font-family: var(--mono); font-size: 0.78rem; line-height: 1.7;
+      white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow-y: auto;
+      color: var(--accent2);
+    }
+
+    .error-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+    .error-item {
+      display: flex; gap: 0.75rem; align-items: flex-start;
+      padding: 0.7rem 0.9rem; border-radius: 8px; background: var(--surface2);
+      border-left: 3px solid var(--danger);
+    }
+    .error-item.warning { border-color: var(--warn); }
+    .error-item.info { border-color: var(--accent2); }
+    .error-badge {
+      font-family: var(--mono); font-size: 0.7rem; padding: 0.15rem 0.5rem;
+      border-radius: 4px; white-space: nowrap; margin-top: 1px;
+    }
+    .badge-error { background: rgba(245,101,101,0.15); color: var(--danger); }
+    .badge-warn { background: rgba(246,173,85,0.15); color: var(--warn); }
+    .badge-info { background: rgba(79,209,197,0.15); color: var(--accent2); }
+    .error-line { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+    .error-msg { font-size: 0.85rem; color: var(--text); }
+
+    .score-ring {
+      display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+      padding: 1rem;
+    }
+    .score-val { font-family: var(--mono); font-size: 2.5rem; font-weight: 700; }
+    .score-label { font-size: 0.78rem; color: var(--muted); }
+
+    .tabs { display: flex; gap: 0.5rem; padding: 0.8rem 1.2rem 0; border-bottom: 1px solid var(--border); }
+    .tab {
+      padding: 0.4rem 0.9rem; border-radius: 6px 6px 0 0; font-size: 0.82rem;
+      cursor: pointer; border: none; background: none; color: var(--muted);
+      font-family: var(--sans); border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: all 0.15s;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* HISTORY PAGE */
+    .history-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .history-item {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.1rem 1.4rem; display: flex; align-items: center; gap: 1.2rem;
+      transition: border-color 0.2s; cursor: pointer;
+    }
+    .history-item:hover { border-color: var(--accent); }
+    .lang-badge {
+      font-family: var(--mono); font-size: 0.72rem; padding: 0.2rem 0.6rem;
+      border-radius: 6px; background: rgba(124,106,247,0.15); color: var(--accent);
+      white-space: nowrap; text-transform: uppercase;
+    }
+    .history-title { font-weight: 500; font-size: 0.95rem; }
+    .history-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
+    .history-right { margin-left: auto; display: flex; align-items: center; gap: 1rem; }
+    .pill {
+      font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 20px;
+    }
+    .pill-success { background: rgba(104,211,145,0.15); color: var(--success); }
+    .pill-fail { background: rgba(245,101,101,0.15); color: var(--danger); }
+    .pill-pending { background: rgba(107,114,128,0.15); color: var(--muted); }
+
+    /* LOADING */
+    .loading-wrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 3rem; }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state { text-align: center; padding: 4rem 2rem; color: var(--muted); }
+    .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .empty-state p { font-size: 0.95rem; }
+
+    .alert {
+      padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem;
+    }
+    .alert-error { background: rgba(245,101,101,0.1); border: 1px solid rgba(245,101,101,0.3); color: var(--danger); }
+    .alert-success { background: rgba(104,211,145,0.1); border: 1px solid rgba(104,211,145,0.3); color: var(--success); }
+
+    .suggestions-text { font-size: 0.88rem; line-height: 1.8; color: var(--text); white-space: pre-wrap; }
+    .full-width { grid-column: 1 / -1; }
+
+    .pagination { display: flex; gap: 0.5rem; align-items: center; justify-content: center; margin-top: 1.5rem; }
+    .page-btn { padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
+    .page-btn:hover, .page-btn.active-page { border-color: var(--accent); color: var(--accent); }
+    .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .filters { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .filters select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 0.5rem 0.8rem; font-size: 0.85rem; }
+
+    .glow { box-shadow: 0 0 30px rgba(124,106,247,0.08); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">⟨ CodeAnalyzer /⟩</div>
+  <div class="nav-links">
+    <button class="nav-link active" onclick="showPage('home', this)">Home</button>
+    <button class="nav-link" onclick="showPage('analyze', this)">Analyze</button>
+    <button class="nav-link" onclick="showPage('history', this)">History</button>
+  </div>
+</nav>
+
+<main>
+
+<!-- ═══════════════ HOME PAGE ═══════════════ -->
+<div id="page-home" class="page">
+  <div class="hero">
+    <h1>Fix &amp; Optimize<br/><span>Any Code</span> with AI</h1>
+    <p>Paste your code, choose the language, and let Gemini AI detect bugs, correct errors, and suggest optimizations.</p>
+    <div class="hero-btns">
+      <button class="btn btn-primary" onclick="showPage('analyze', document.querySelectorAll('.nav-link')[1])">⚡ Analyze Code</button>
+      <button class="btn btn-secondary" onclick="showPage('history', document.querySelectorAll('.nav-link')[2])">📋 View History</button>
+    </div>
+  </div>
+
+  <div class="stats-grid" id="home-stats">
+    <div class="stat-card">
+      <div class="stat-val" id="stat-total">—</div>
+      <div class="stat-label">Total Analyses</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-errors">—</div>
+      <div class="stat-label">Errors Fixed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-score">—</div>
+      <div class="stat-label">Avg Quality Score</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="stat-langs">—</div>
+      <div class="stat-label">Languages Supported</div>
+    </div>
+  </div>
+
+  <div class="section-title">Recent Analyses</div>
+  <div id="home-recent"></div>
+</div>
+
+<!-- ═══════════════ ANALYZE PAGE ═══════════════ -->
+<div id="page-analyze" class="page hidden">
+  <div class="section-title" style="margin-bottom:1.5rem">⚡ Code Analyzer</div>
+
+  <div class="alert alert-error hidden" id="analyze-error"></div>
+
+  <div class="analyze-grid">
+    <!-- INPUT -->
+    <div class="card glow">
+      <div class="card-header">
+        <span class="card-title">Input Code</span>
+        <button class="btn btn-primary btn-sm" onclick="submitAnalysis()" id="analyze-btn">Analyze →</button>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">Title</label>
+          <input type="text" class="form-input" id="code-title" placeholder="e.g. Bubble Sort Fix"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Language</label>
+          <select class="form-select" id="code-language">
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="java">Java</option>
+            <option value="cpp">C++</option>
+            <option value="c">C</option>
+            <option value="go">Go</option>
+            <option value="rust">Rust</option>
+            <option value="php">PHP</option>
+            <option value="ruby">Ruby</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Code</label>
+          <textarea class="form-textarea" id="code-input" placeholder="# Paste your code here...&#10;def bubble_sort(arr):&#10;    for i in range(len(arr)):&#10;        for j in range(len(arr)-i):  # Bug: should be len(arr)-i-1&#10;            if arr[j] &gt; arr[j+1]:&#10;                arr[j], arr[j+1] = arr[j+1], arr[j]"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="result-panel">
+      <div class="card" style="height:100%">
+        <div class="card-header"><span class="card-title">Results</span></div>
+        <div class="card-body" id="result-body">
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <p>Submit code to see analysis results here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULL-WIDTH RESULTS (after analysis) -->
+  <div id="results-bottom" class="hidden" style="margin-top:1.5rem">
+    <div class="analyze-grid">
+      <div class="card">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('corrected', this)">✅ Corrected Code</button>
+          <button class="tab" onclick="switchTab('optimized', this)">⚡ Optimized Code</button>
+        </div>
+        <div class="card-body">
+          <div id="tab-corrected" class="result-code"></div>
+          <div id="tab-optimized" class="result-code hidden"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">💡 Suggestions &amp; Explanation</span></div>
+        <div class="card-body">
+          <div class="section-title" style="margin-bottom:0.5rem">Suggestions</div>
+          <div class="suggestions-text" id="ai-suggestions">—</div>
+          <div class="section-title" style="margin-top:1rem;margin-bottom:0.5rem">Explanation</div>
+          <div class="suggestions-text" id="ai-explanation">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ HISTORY PAGE ═══════════════ -->
+<div id="page-history" class="page hidden">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem">
+    <div class="section-title" style="margin:0">📋 Analysis History</div>
+    <button class="btn btn-danger" onclick="clearHistory()">🗑 Clear All</button>
+  </div>
+
+  <div class="filters">
+    <select id="filter-lang" onchange="loadHistory(1)">
+      <option value="">All Languages</option>
+      <option value="python">Python</option>
+      <option value="javascript">JavaScript</option>
+      <option value="typescript">TypeScript</option>
+      <option value="java">Java</option>
+      <option value="cpp">C++</option>
+      <option value="go">Go</option>
+      <option value="rust">Rust</option>
+    </select>
+    <select id="filter-status" onchange="loadHistory(1)">
+      <option value="">All Status</option>
+      <option value="completed">Completed</option>
+      <option value="failed">Failed</option>
+    </select>
+  </div>
+
+  <div id="history-list">
+    <div class="loading-wrap"><div class="spinner"></div><p>Loading history...</p></div>
+  </div>
+
+  <div class="pagination" id="history-pagination"></div>
+</div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+const API = 'http://127.0.0.1:8000/api';
+
+// ═══════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.remove('hidden');
+  if (btn) btn.classList.add('active');
+
+  if (name === 'home') loadHomeStats();
+  if (name === 'history') loadHistory(1);
+}
+
+// ═══════════════════════════════════════════
+// HOME
+// ═══════════════════════════════════════════
+async function loadHomeStats() {
+  try {
+    const res = await fetch(`${API}/stats`);
+    if (!res.ok) throw new Error('Failed to load stats');
+    const data = await res.json();
+
+    document.getElementById('stat-total').textContent = data.total_analyses;
+    document.getElementById('stat-errors').textContent = data.total_errors_fixed;
+    document.getElementById('stat-score').textContent = data.avg_quality_score ? data.avg_quality_score + '/100' : '—';
+    document.getElementById('stat-langs').textContent = data.languages_used.length || '—';
+
+    const recentEl = document.getElementById('home-recent');
+    if (!data.recent_analyses.length) {
+      recentEl.innerHTML = `<div class="empty-state"><div class="empty-icon">🚀</div><p>No analyses yet. <button class="btn btn-primary btn-sm" onclick="showPage('analyze', document.querySelectorAll('.nav-link')[1])">Start now</button></p></div>`;
+      return;
+    }
+    recentEl.innerHTML = `<div class="history-list">${data.recent_analyses.map(historyCard).join('')}</div>`;
+  } catch(e) {
+    document.getElementById('home-recent').innerHTML = `<div class="alert alert-error">⚠️ Could not connect to backend at ${API}. Make sure FastAPI is running.</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════
+// ANALYZE
+// ═══════════════════════════════════════════
+async function submitAnalysis() {
+  const code = document.getElementById('code-input').value.trim();
+  const language = document.getElementById('code-language').value;
+  const title = document.getElementById('code-title').value || 'Untitled Analysis';
+  const errEl = document.getElementById('analyze-error');
+
+  errEl.classList.add('hidden');
+  if (!code) {
+    errEl.textContent = '⚠️ Please paste some code before analyzing.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('analyze-btn');
+  btn.textContent = 'Analyzing...';
+  btn.disabled = true;
+
+  document.getElementById('result-body').innerHTML = `<div class="loading-wrap"><div class="spinner"></div><p>Running AI analysis...</p></div>`;
+  document.getElementById('results-bottom').classList.add('hidden');
+
+  try {
+    const res = await fetch(`${API}/analyze/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, language, code }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Analysis failed');
+    }
+    const data = await res.json();
+    displayResults(data);
+  } catch(e) {
+    errEl.textContent = `⚠️ Error: ${e.message}`;
+    errEl.classList.remove('hidden');
+    document.getElementById('result-body').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><p>${e.message}</p></div>`;
+  } finally {
+    btn.textContent = 'Analyze →';
+    btn.disabled = false;
+  }
+}
+
+function displayResults(data) {
+  // Errors panel
+  const errorHtml = data.errors_found.length
+    ? `<ul class="error-list">${data.errors_found.map(e => `
+        <li class="error-item ${e.severity}">
+          <span class="error-badge badge-${e.severity === 'error' ? 'error' : e.severity === 'warning' ? 'warn' : 'info'}">${e.type || e.severity}</span>
+          <div>
+            ${e.line ? `<div class="error-line">Line ${e.line}</div>` : ''}
+            <div class="error-msg">${e.message}</div>
+          </div>
+        </li>`).join('')}</ul>`
+    : `<div class="alert alert-success">✅ No errors found!</div>`;
+
+  const scoreColor = (data.quality_score >= 80) ? 'var(--success)' : (data.quality_score >= 50) ? 'var(--warn)' : 'var(--danger)';
+
+  document.getElementById('result-body').innerHTML = `
+    <div class="score-ring">
+      <div class="score-val" style="color:${scoreColor}">${data.quality_score ?? '—'}</div>
+      <div class="score-label">Quality Score (before fixes)</div>
+    </div>
+    <div style="display:flex;gap:1rem;text-align:center;margin-bottom:1rem">
+      <div style="flex:1;background:var(--surface2);border-radius:8px;padding:0.8rem">
+        <div style="font-family:var(--mono);color:var(--danger);font-size:1.3rem">${data.error_count}</div>
+        <div style="font-size:0.75rem;color:var(--muted)">Errors Found</div>
+      </div>
+      <div style="flex:1;background:var(--surface2);border-radius:8px;padding:0.8rem">
+        <div style="font-family:var(--mono);color:var(--accent2);font-size:1.3rem">${data.lines_of_code}</div>
+        <div style="font-size:0.75rem;color:var(--muted)">Lines of Code</div>
+      </div>
+    </div>
+    <div class="section-title" style="margin-bottom:0.5rem">Errors Detected</div>
+    ${errorHtml}
+  `;
+
+  // Bottom tabs
+  document.getElementById('tab-corrected').textContent = data.corrected_code || '(no changes needed)';
+  document.getElementById('tab-optimized').textContent = data.optimized_code || '(no optimization needed)';
+  document.getElementById('ai-suggestions').textContent = data.suggestions || '—';
+  document.getElementById('ai-explanation').textContent = data.explanation || '—';
+  document.getElementById('results-bottom').classList.remove('hidden');
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('#results-bottom .tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-corrected').classList.add('hidden');
+  document.getElementById('tab-optimized').classList.add('hidden');
+  document.getElementById('tab-' + name).classList.remove('hidden');
+  btn.classList.add('active');
+}
+
+// ═══════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════
+let currentPage = 1;
+
+async function loadHistory(page = 1) {
+  currentPage = page;
+  const lang = document.getElementById('filter-lang')?.value || '';
+  const status = document.getElementById('filter-status')?.value || '';
+  const listEl = document.getElementById('history-list');
+  const pagEl = document.getElementById('history-pagination');
+
+  listEl.innerHTML = `<div class="loading-wrap"><div class="spinner"></div></div>`;
+
+  try {
+    const params = new URLSearchParams({ page, per_page: 10, ...(lang && {language: lang}), ...(status && {status}) });
+    const res = await fetch(`${API}/history/?${params}`);
+    if (!res.ok) throw new Error('Failed to load history');
+    const data = await res.json();
+
+    if (!data.items.length) {
+      listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>No analysis history yet.</p></div>`;
+      pagEl.innerHTML = '';
+      return;
+    }
+
+    listEl.innerHTML = `<div class="history-list">${data.items.map(historyCard).join('')}</div>`;
+
+    // Pagination
+    const totalPages = Math.ceil(data.total / data.per_page);
+    let pag = '';
+    pag += `<button class="page-btn" onclick="loadHistory(${page-1})" ${page<=1?'disabled':''}>‹</button>`;
+    for (let i = 1; i <= totalPages; i++) {
+      pag += `<button class="page-btn ${i===page?'active-page':''}" onclick="loadHistory(${i})">${i}</button>`;
+    }
+    pag += `<button class="page-btn" onclick="loadHistory(${page+1})" ${page>=totalPages?'disabled':''}>›</button>`;
+    pagEl.innerHTML = pag;
+
+  } catch(e) {
+    listEl.innerHTML = `<div class="alert alert-error">⚠️ Could not load history: ${e.message}</div>`;
+  }
+}
+
+function historyCard(item) {
+  const date = new Date(item.created_at).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const statusClass = item.status === 'completed' ? 'pill-success' : item.status === 'failed' ? 'pill-fail' : 'pill-pending';
+  return `
+    <div class="history-item" onclick="viewAnalysis(${item.id})">
+      <span class="lang-badge">${item.language}</span>
+      <div>
+        <div class="history-title">${item.title || 'Untitled'}</div>
+        <div class="history-meta">${item.lines_of_code} lines · ${item.error_count} errors · ${date}</div>
+      </div>
+      <div class="history-right">
+        ${item.quality_score != null ? `<span style="font-family:var(--mono);font-size:0.85rem;color:var(--accent)">${item.quality_score}/100</span>` : ''}
+        <span class="pill ${statusClass}">${item.status}</span>
+      </div>
+    </div>`;
+}
+
+async function viewAnalysis(id) {
+  try {
+    const res = await fetch(`${API}/analyze/${id}`);
+    if (!res.ok) throw new Error('Not found');
+    const data = await res.json();
+
+    // Switch to analyze page and show results
+    showPage('analyze', document.querySelectorAll('.nav-link')[1]);
+    document.getElementById('code-input').value = data.original_code;
+    document.getElementById('code-language').value = data.language;
+    document.getElementById('code-title').value = data.title;
+    displayResults(data);
+  } catch(e) {
+    alert('Failed to load analysis: ' + e.message);
+  }
+}
+
+async function clearHistory() {
+  if (!confirm('Delete all history records? This cannot be undone.')) return;
+  try {
+    await fetch(`${API}/history/`, { method: 'DELETE' });
+    loadHistory(1);
+  } catch(e) {
+    alert('Failed to clear history: ' + e.message);
+  }
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+loadHomeStats();
+</script>
+</body>
+</html>
